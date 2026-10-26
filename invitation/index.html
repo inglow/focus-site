@@ -1,0 +1,133 @@
+<!doctype html>
+<!--
+  La page de repli du lien d'invitation (PLAN, étape 3, option B). Publiée sur
+  GitHub Pages (inglow.github.io/focus-site/invitation/, dépôt public
+  inglow/focus-site), son adresse va dans la variable
+  GitHub FOCUS_INVITE_PAGE_URL ; la fonction `invitations` y met le jeton après
+  le `#`, que le navigateur n'envoie ni à GitHub ni dans un Referer. La page le
+  remet à l'app par son schéma, sans rien charger d'autre (la politique de
+  sécurité l'interdit), et l'efface de la barre d'adresse ; l'onglet le garde,
+  pour qu'un retour arrière ou un rechargement retrouve le bouton.
+
+  Le schéma est celui d'app.json, et le jeton a la forme qu'exige la base
+  (_shared/token.ts) : des tests Jest les gardent identiques. Le déploiement
+  vérifie que la page publiée est ce fichier. Le nom de l'app, provisoire, n'y
+  figure pas.
+-->
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <title>Votre invitation</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px 20px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #0a1f14;
+        background: #ffffff;
+      }
+      main {
+        max-width: 420px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 600;
+      }
+      p {
+        font-size: 15px;
+        line-height: 22px;
+        color: #4a5a52;
+      }
+      /* Pas sur un bouton masqué : `hidden` doit gagner. */
+      a.bouton:not([hidden]) {
+        display: block;
+        margin: 24px 0 16px;
+        padding: 12px 20px;
+        border-radius: 12px;
+        background: #2c8862;
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Votre invitation</h1>
+      <p id="message">Ouverture de l'application…</p>
+      <a id="ouvrir" class="bouton" hidden>Ouvrir l'application</a>
+      <p id="aide" hidden>
+        Si rien ne s'ouvre, installez l'application, puis touchez de nouveau le lien de
+        l'e-mail.
+      </p>
+    </main>
+    <script>
+      var SCHEMA = "focus";
+      var CLE = "invitation";
+
+      // Le lien qui ouvre l'app, ou null si le fragment ne porte pas un jeton
+      // de la forme qu'exige la base : 43 caractères base64url.
+      function lienApplication(fragment) {
+        var jeton = new URLSearchParams(fragment.replace(/^#/, "")).get("token");
+        if (!jeton || !/^[A-Za-z0-9_-]{43}$/.test(jeton)) return null;
+        return SCHEMA + "://invitation?token=" + jeton;
+      }
+
+      // L'onglet garde le fragment, que la barre d'adresse a perdu ; sans
+      // stockage (navigation privée), rien n'est gardé.
+      function garder(fragment) {
+        try {
+          sessionStorage.setItem(CLE, fragment);
+        } catch (e) {}
+      }
+
+      function relire() {
+        try {
+          return sessionStorage.getItem(CLE) || "";
+        } catch (e) {
+          return "";
+        }
+      }
+
+      if (typeof document !== "undefined") {
+        var fragment = location.hash;
+        var retour = !fragment;
+        if (retour) {
+          fragment = relire();
+        } else {
+          // Le jeton ne reste pas dans la barre d'adresse.
+          history.replaceState(null, "", location.pathname);
+          if (lienApplication(fragment)) garder(fragment);
+        }
+        var lien = lienApplication(fragment);
+        if (lien) {
+          var bouton = document.getElementById("ouvrir");
+          bouton.href = lien;
+          bouton.hidden = false;
+          document.getElementById("aide").hidden = false;
+          if (retour) {
+            document.getElementById("message").textContent =
+              "Touchez le bouton pour ouvrir l'application.";
+          } else {
+            // Une entrée de plus dans l'historique : un navigateur qui ne sait
+            // pas ouvrir l'app y affiche son erreur, et le retour ramène ici.
+            location.href = lien;
+          }
+        } else {
+          document.getElementById("message").textContent =
+            "Ce lien d'invitation est incomplet. Ouvrez-le depuis l'e-mail reçu, sans le modifier.";
+        }
+      }
+    </script>
+  </body>
+</html>
